@@ -43,6 +43,7 @@ export default function Home() {
     string | undefined
   >(undefined);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/categories")
@@ -52,7 +53,9 @@ export default function Home() {
 
   useEffect(() => {
     if (selectedCategory) {
-      fetch(`/api/subcategories`)
+      fetch(
+        `/api/subcategories?category=${encodeURIComponent(selectedCategory)}`
+      )
         .then((res) => res.json())
         .then((data) => setSubCategories(data.subCategories));
     } else {
@@ -63,6 +66,7 @@ export default function Home() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (search) params.append("search", search);
     if (selectedCategory) params.append("category", selectedCategory);
@@ -73,8 +77,12 @@ export default function Home() {
       .then((res) => res.json())
       .then((data) => {
         setProducts(data.products);
-        setLoading(false);
-      });
+      })
+      .catch(() => {
+        setProducts([]);
+        setError("Failed to load products. Please try again.");
+      })
+      .finally(() => setLoading(false));
   }, [search, selectedCategory, selectedSubCategory]);
 
   return (
@@ -151,6 +159,10 @@ export default function Home() {
           <div className="text-center py-12">
             <p className="text-muted-foreground">Loading products...</p>
           </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">{error}</p>
+          </div>
         ) : products.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No products found</p>
@@ -162,14 +174,10 @@ export default function Home() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
-                <Link
+                <Card
                   key={product.stacklineSku}
-                  href={{
-                    pathname: "/product",
-                    query: { product: JSON.stringify(product) },
-                  }}
+                  className="h-full hover:shadow-lg transition-shadow"
                 >
-                  <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
                     <CardHeader className="p-0">
                       <div className="relative h-48 w-full overflow-hidden rounded-t-lg bg-muted">
                         {product.imageUrls[0] && (
@@ -197,12 +205,13 @@ export default function Home() {
                       </CardDescription>
                     </CardContent>
                     <CardFooter>
-                      <Button variant="outline" className="w-full">
-                        View Details
+                      <Button asChild variant="outline" className="w-full">
+                        <Link href={`/product/${product.stacklineSku}`}>
+                          View Details
+                        </Link>
                       </Button>
                     </CardFooter>
-                  </Card>
-                </Link>
+                </Card>
               ))}
             </div>
           </>

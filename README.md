@@ -1,13 +1,18 @@
-# Stackline Full Stack Assignment
+# StackShop – Stackline Full Stack Assessment (Bug Fixes)
 
-## Overview
+## Summary
+This repo is a small Next.js (App Router) eCommerce demo with intentional bugs across UX, functionality, and route/API usage.
 
-This is a sample eCommerce website that includes:
-- Product List Page
-- Search Results Page
-- Product Detail Page
+I focused on fixes that:
+- improve correctness and user experience in the core flows (filters + product detail)
+- reduce fragility/security risk (avoid shipping serialized product JSON in URLs)
+- keep changes reviewable and aligned with typical production patterns
 
-The application contains various bugs including UX issues, design problems, functionality bugs, and potential security vulnerabilities.
+## Tech
+- Next.js (App Router)
+- TypeScript
+- Tailwind + shadcn/ui
+- JSON-backed `productService`
 
 ## Getting Started
 
@@ -16,22 +21,60 @@ yarn install
 yarn dev
 ```
 
-## Your Task
+## What I Fixed
 
-1. **Identify and fix bugs** - Review the application thoroughly and fix any issues you find
-2. **Document your work** - Create a comprehensive README that includes:
-   - What bugs/issues you identified
-   - How you fixed each issue
-   - Why you chose your approach
-   - Any improvements or enhancements you made
+### 1) Subcategory filtering did not respect the selected category
+**Issue:** The UI fetched `/api/subcategories` without passing the selected category, so the subcategory dropdown could not be correctly scoped.
 
-We recommend spending no more than 2 hours on this assignment. We are more interested in the quality of your work and your communication than the amount of time you spend or how many bugs you fix!
+**Fix:** Updated the request to include `?category=<selectedCategory>` (URL-encoded) so the server can filter correctly.
 
-## Submission
+**Why this approach:** The API route already supports category filtering through query params, so this is the smallest correct change.
 
-- Fork this repository
-- Make your fixes and improvements
-- **Replace this README** with your own that clearly documents all changes and your reasoning
-- Provide your Stackline contact with a link to a git repository where you have committed your changes
+---
 
-We're looking for clear communication about your problem-solving process as much as the technical fixes themselves.
+### 2) Product detail navigation used serialized product JSON in the URL
+**Issue:** The list page navigated to `/product` using a `product=<JSON string>` query param. This is fragile and has downsides:
+- very long URLs / encoding issues
+- breaks deep-linking and refresh reliability
+- forces parsing untrusted URL data (`JSON.parse`)
+
+**Fix:** Switched to SKU-based routing using `/product/[sku]` and loaded the product via `/api/products/[sku]`.
+
+**Why this approach:** Stable identifiers in the URL are standard for commerce product pages, support refresh/deep-linking, and reduce risk from URL-driven JSON parsing.
+
+---
+
+### 3) `/api/products/[sku]` route handler used incorrect params typing
+**Issue:** The route handler typed `params` as a Promise and awaited it. In Next.js route handlers, `params` is provided as an object.
+
+**Fix:** Corrected the handler signature to `{ params: { sku: string } }`.
+
+**Why this approach:** Aligns with Next.js conventions and avoids runtime/type inconsistencies.
+
+---
+
+### 4) Loading state could get stuck on network/API errors
+**Issue:** The product list page only cleared `loading` on success.
+
+**Fix:** Added `.catch()` and `.finally()` so loading always resolves and the UI shows a basic error state.
+
+**Why this approach:** Prevents “infinite loading” UX and makes failures visible.
+
+---
+
+### 5) Accessibility/UX improvement: removed nested interactive elements
+**Issue:** A `<Link>` wrapped a `<Button>` inside the product card, creating nested interactive elements and inconsistent click/keyboard behavior.
+
+**Fix:** The card is no longer wrapped in a Link; instead the footer uses `Button asChild` with a Link to the product detail page.
+
+**Why this approach:** Improves accessibility and keeps a clear click target.
+
+## Notes / Tradeoffs
+- Kept changes intentionally scoped and easy to review.
+- Did not add pagination, caching, or tests due to the time-box.
+
+## If I Had More Time
+- Add debounced search to reduce request volume
+- Add pagination UI to match the existing `limit`/`offset` API support
+- Persist filter selections in the URL query parameter
+- Add a small test suite (unit tests for `productService`, basic route tests)
